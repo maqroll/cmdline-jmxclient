@@ -28,6 +28,8 @@ public class Rest {
 		this.values = values;
 	}
 
+	private static final int PORT = 9090;
+	
 	@GET
 	@Path("/{id}")
 	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
@@ -59,7 +61,7 @@ public class Rest {
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.setContextPath("/");
 
-		jettyServer = new Server(9090);
+		jettyServer = new Server(PORT);
 		jettyServer.setHandler(context);
 
 		ResourceConfig rc = new ResourceConfig();

@@ -10,6 +10,7 @@
 <div id="example1"></div>
 <div id="FetchFollowerPerSec"></div>
 <div id="idle"></div>
+<div id="networkIdle"></div>
 <div id="underReplicated"></div>
 <div id="bytesIn"></div>
 <div id="bytesOut"></div>
@@ -72,7 +73,8 @@ var context = cubism.context()
     .step(2000)
     .size(960);
 
-var idle = jmx("kafka.server:type=KafkaRequestHandlerPool,name=RequestHandlerAvgIdlePercent@OneMinuteRate","idle"),
+var idle = jmx("kafka.server:type=KafkaRequestHandlerPool,name=RequestHandlerAvgIdlePercent@OneMinuteRate","request idle"),
+  network_idle = jmx("kafka.network:name=NetworkProcessorAvgIdlePercent,type=SocketServer@Value","network idle"),
   underReplicated = jmx("kafka.server:name=UnderReplicatedPartitions,type=ReplicaManager@Value","underreplicated"),
   bytesIn = jmx("kafka.server:name=BytesInPerSec,type=BrokerTopicMetrics@OneMinuteRate","bytes in"),
   bytesOut = jmx("kafka.server:name=BytesOutPerSec,type=BrokerTopicMetrics@OneMinuteRate","bytes out"),
@@ -127,7 +129,16 @@ d3.select("#idle").call(function(div) {
       .data([idle.multiply(-1).add(1)])
     .enter().append("div")
       .attr("class", "horizon")
-      .call(context.horizon().extent([0,1]).height(35).title("occupation").colors(["#fee5d9","#fcae91","#fb6a4a","#cb181d","#fee5d9","#fcae91","#fb6a4a","#cb181d"]));
+      .call(context.horizon().extent([0,1]).height(35).title("request pool use").colors(["#fee5d9","#fcae91","#fb6a4a","#cb181d","#fee5d9","#fcae91","#fb6a4a","#cb181d"]));
+});
+
+d3.select("#networkIdle").call(function(div) {
+// Añade los datos
+  div.selectAll(".horizon")
+      .data([network_idle.multiply(-1).add(1)])
+    .enter().append("div")
+      .attr("class", "horizon")
+      .call(context.horizon().extent([0,1]).height(35).title("network pool use").colors(["#fee5d9","#fcae91","#fb6a4a","#cb181d","#fee5d9","#fcae91","#fb6a4a","#cb181d"]));
 });
 
 d3.select("#underReplicated").call(function(div) {

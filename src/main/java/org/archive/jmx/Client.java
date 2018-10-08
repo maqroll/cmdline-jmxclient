@@ -82,8 +82,7 @@ public class Client {
     
     private static JMXConnector jmxc;
 
-    
-
+    private static final long SLEEP_TIME = 1000;
     
     private static HashMap<String,Values> values = new HashMap<String,Values>();
     
@@ -294,7 +293,7 @@ public class Client {
 	        }
 	        //logger.info("---------------------------------");
 	        //System.out.flush(); System.err.flush();
-	        Thread.sleep(1000);
+	        Thread.sleep(SLEEP_TIME);
         }
         
     }

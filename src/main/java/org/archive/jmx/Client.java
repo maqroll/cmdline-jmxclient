@@ -31,9 +31,11 @@ import java.io.StringWriter;
 import java.text.FieldPosition;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.ConsoleHandler;
@@ -77,6 +79,13 @@ import javax.management.remote.JMXServiceURL;
 public class Client {
     private static final Logger logger =
         Logger.getLogger(Client.class.getName());
+    
+    private static JMXConnector jmxc;
+
+    
+
+    
+    private static HashMap<String,Values> values = new HashMap<String,Values>();
     
     /**
      * Usage string.
@@ -244,31 +253,50 @@ public class Client {
         String beanname = null;
         String [] command = null;
         if (args.length > 2) {
-            beanname = args[2];
+            command = new String [args.length - 2];
+            for (int i = 2; i < args.length; i++) {
+                command[i - 2] = args[i];
+            }
         }
-        if (args.length > 3) {
+        /*if (args.length > 3) {
             command = new String [args.length - 3];
             for (int i = 3; i < args.length; i++) {
                 command[i - 3] = args[i];
             }
-        }
+        }*/
         String [] loginPassword = parseUserpass(userpass);
-        Object [] result = execute(hostport,
-            ((loginPassword == null)? null: loginPassword[0]),
-            ((loginPassword == null)? null: loginPassword[1]), beanname,
-            command);
-        // Print out results on stdout. Only log if a result.
-        if (result != null) {
-            for (int i = 0; i < result.length; i++) {
-                if (result[i] != null && result[i].toString().length() > 0) {
-                    if (command != null) {
-                        logger.info(command[i] + ": " + result[i]);
-                    } else {
-                        logger.info("\n" + result[i].toString());
-                    }
-                }
-            }
+
+        /* Init */
+    	for (String c : command) {
+    		values.put(c, new Values());
+    	}
+    	
+        new Rest(values).start();
+        
+    	// main loop
+        while (true) {
+	        Object [] result = execute(hostport,
+	            ((loginPassword == null)? null: loginPassword[0]),
+	            ((loginPassword == null)? null: loginPassword[1]), beanname,
+	            command);
+	        // Print out results on stdout. Only log if a result.
+	        if (result != null) {
+	            for (int i = 0; i < result.length; i++) {
+	                if (result[i] != null && result[i].toString().length() > 0) {
+	                    if (command != null) {
+	                        //logger.info(/*command[i] + ": " +*/ result[i].toString());
+	                    } else {
+	                        //logger.info("\n" + result[i].toString());
+	                    }
+	                }
+	            }
+	            //System.out.flush(); System.err.flush();
+	        }
+	        //logger.info("---------------------------------");
+	        //System.out.flush(); System.err.flush();
+	        Thread.sleep(1000);
         }
+        
     }
     
     protected Object [] execute(final String hostport, final String login,
@@ -306,13 +334,23 @@ public class Client {
             final String password, final String beanname,
             final String [] command, final boolean oneBeanOnly)
     throws Exception {
-        JMXConnector jmxc = getJMXConnector(hostport, login, password);
+    	if (jmxc == null) {
+    		jmxc = getJMXConnector(hostport, login, password);
+    	}
         Object [] result = null;
+        
         try {
-            result = doBeans(jmxc.getMBeanServerConnection(),
-                getObjectName(beanname), command, oneBeanOnly);
+            /*result = doBeans(jmxc.getMBeanServerConnection(),
+                getObjectName(beanname), command, oneBeanOnly);*/
+        	// nombre|atributo
+        	MBeanServerConnection conn = jmxc.getMBeanServerConnection();
+        	for(String c : command) {
+        		String[] p = c.split("@");
+        		Object r = conn.getAttribute(new ObjectName(p[0]), p[1]);
+        		values.get(c).add(r.toString());
+        	}
         } finally {
-            jmxc.close();
+            //jmxc.close();
         }
         return result;
     }
@@ -355,10 +393,16 @@ public class Client {
             for (Iterator i = beans.iterator(); i.hasNext();) {
                 Object obj = i.next();
                 if (obj instanceof ObjectName) {
-                    buffer.append((((ObjectName) obj).getCanonicalName()));
+                    //buffer.append((((ObjectName) obj).getCanonicalName()));
                 } else if (obj instanceof ObjectInstance) {
-                    buffer.append((((ObjectInstance) obj).getObjectName()
-                        .getCanonicalName()));
+                	if (command == null || command.length <= 0) {
+                		buffer.append((((ObjectInstance) obj).getObjectName().getCanonicalName()));
+                	} else {
+                		Object[] res = doBean(mbsc, (ObjectInstance) obj, command);
+                		for(Object o : res) { // Solo hay uno pero just in case!!
+                    		buffer.append(((ObjectInstance) obj).getObjectName().getCanonicalName() + ':' + o.toString());	
+                		}
+                	}
                 } else {
                     throw new RuntimeException("Unexpected object type: " + obj);
                 }
@@ -753,14 +797,14 @@ public class Client {
             this.buffer.setLength(0);
             this.date.setTime(record.getMillis());
             this.position.setBeginIndex(0);
-            this.formatter.format(this.date, this.buffer, this.position);
-            this.buffer.append(' ');
-            if (record.getSourceClassName() != null) {
-                this.buffer.append(record.getSourceClassName());
-            } else {
-                this.buffer.append(record.getLoggerName());
-            }
-            this.buffer.append(' ');
+            //this.formatter.format(this.date, this.buffer, this.position);
+            //this.buffer.append(' ');
+            //if (record.getSourceClassName() != null) {
+            //    this.buffer.append(record.getSourceClassName());
+            //} else {
+            //    this.buffer.append(record.getLoggerName());
+            //}
+            //this.buffer.append(' ');
             this.buffer.append(formatMessage(record));
             this.buffer.append(System.getProperty("line.separator"));
             if (record.getThrown() != null) {

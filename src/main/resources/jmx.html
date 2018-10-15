@@ -8,51 +8,10 @@
 <div id="body">
 
 <div id="example1"></div>
-<div id="FetchFollowerPerSec"></div>
-<div id="idle"></div>
-<div id="networkIdle"></div>
-<div id="underReplicated"></div>
-<div id="bytesIn"></div>
-<div id="bytesOut"></div>
-<div id="messagesIn"></div>
-<div id="failedFetch"></div>
-<div id="failedProduce"></div>
-<div id="totalFetch"></div>
-<div id="totalProduce"></div>
-<div id="FetchConsumerPerSec"></div>
-<div id="FetchPerSec"></div>
-<div id="OffsetCommitPerSec"></div>
-<div id="OffsetFetchPerSec"></div>
-<div id="ProducePerSec"></div>
-<div id="FetchConsumerTime"></div>
-<div id="FetchFollowerTime"></div>
-<div id="FetchTime"></div>
-<div id="OffsetCommitTime"></div>
-<div id="OffsetFetchTime"></div>
-<div id="ProduceTime"></div>
 
 <script src="http://square.github.com/cubism/d3.v2.js"></script>
 <script src="http://square.github.com/cubism/cubism.v1.js"></script>
 <script>
-function random(name) {
-  var value = 0,
-      values = [],
-      i = 0,
-      last;
-  return context.metric(function(start, stop, step, callback) {
-    console.log(start + ',' + stop + ',' + step);
-    start = +start, stop = +stop;
-    console.log(start + ',' + stop + ',' + step);
-    if (isNaN(last)) last = start;
-    while (last < stop) {
-      last += step;
-      value = Math.max(-10, Math.min(10, value + .8 * Math.random() - .4 + .2 * Math.cos(i += .2)));
-      values.push(value);
-    }
-    console.log(values.slice((start - stop) / step));
-    callback(null, values = values.slice((start - stop) / step));
-  }, name);
-};
 function jmx(key,expression) {
     return context.metric(function(start, stop, step, callback) {
     start = +start; //start = parseInt(start/1000);
@@ -73,139 +32,57 @@ var context = cubism.context()
     .step(2000)
     .size(960);
 
-var idle = jmx("kafka.server:type=KafkaRequestHandlerPool,name=RequestHandlerAvgIdlePercent@OneMinuteRate","request idle"),
-  network_idle = jmx("kafka.network:name=NetworkProcessorAvgIdlePercent,type=SocketServer@Value","network idle"),
-  underReplicated = jmx("kafka.server:name=UnderReplicatedPartitions,type=ReplicaManager@Value","underreplicated"),
-  bytesIn = jmx("kafka.server:name=BytesInPerSec,type=BrokerTopicMetrics@OneMinuteRate","bytes in"),
-  bytesOut = jmx("kafka.server:name=BytesOutPerSec,type=BrokerTopicMetrics@OneMinuteRate","bytes out"),
-  messagesIn = jmx("kafka.server:name=MessagesInPerSec,type=BrokerTopicMetrics@OneMinuteRate", "messages in"),
-  failedFetch = jmx("kafka.server:name=FailedFetchRequestsPerSec,type=BrokerTopicMetrics@OneMinuteRate", "failed fetch"), 
-  failedProduce = jmx("kafka.server:name=FailedProduceRequestsPerSec,type=BrokerTopicMetrics@OneMinuteRate", "failed produce"), 
-  totalFetch = jmx("kafka.server:name=TotalFetchRequestsPerSec,type=BrokerTopicMetrics@OneMinuteRate", "total fetch"),
-  totalProduce = jmx("kafka.server:name=TotalProduceRequestsPerSec,type=BrokerTopicMetrics@OneMinuteRate", "total produce"),   
-  FetchConsumerPerSec = jmx("kafka.network:name=RequestsPerSec,request=FetchConsumer,type=RequestMetrics@OneMinuteRate", "FetchConsumerPerSec"),
-  FetchFollowerPerSec = jmx("kafka.network:name=RequestsPerSec,request=FetchFollower,type=RequestMetrics@OneMinuteRate", "FetchFollowerPerSec"),
-  FetchPerSec = jmx("kafka.network:name=RequestsPerSec,request=Fetch,type=RequestMetrics@OneMinuteRate", "FetchPerSec"),
-  OffsetCommitPerSec = jmx("kafka.network:name=RequestsPerSec,request=OffsetCommit,type=RequestMetrics@OneMinuteRate", "OffsetCommitPerSec"),
-  OffsetFetchPerSec = jmx("kafka.network:name=RequestsPerSec,request=OffsetFetch,type=RequestMetrics@OneMinuteRate", "OffsetFetchPerSec"),
-  ProducePerSec = jmx("kafka.network:name=RequestsPerSec,request=Produce,type=RequestMetrics@OneMinuteRate", "ProducePerSec"),
-  FetchConsumerTime = jmx("kafka.network:name=TotalTimeMs,request=FetchConsumer,type=RequestMetrics@95thPercentile", "FetchConsumerTime"),
-  FetchFollowerTime = jmx("kafka.network:name=TotalTimeMs,request=FetchFollower,type=RequestMetrics@95thPercentile", "FetchFollowerTime"),
-  FetchTime = jmx("kafka.network:name=TotalTimeMs,request=Fetch,type=RequestMetrics@95thPercentile", "FetchTime"),
-  OffsetCommitTime = jmx("kafka.network:name=TotalTimeMs,request=OffsetCommit,type=RequestMetrics@95thPercentile", "OffsetCommitTime"),
-  OffsetFetchTime = jmx("kafka.network:name=TotalTimeMs,request=OffsetFetch,type=RequestMetrics@95thPercentile", "OffsetFetchTime"),
-  ProduceTime = jmx("kafka.network:name=TotalTimeMs,request=Produce,type=RequestMetrics@95thPercentile", "ProduceTime"),
-  bar = random("bar");
+// TODO use hashchange to make it really dynamic
+let urlParams = new URLSearchParams(window.location.search);
+let filterParam = urlParams.get('filter');
+let filter = new RegExp( (filterParam && (filterParam.length > 0))? urlParams.get('filter') : '.*');
 
-d3.select("#example1").call(function(div) {
-// Añade un eje
-  div.append("div")
-      .attr("class", "axis")
-      .call(context.axis().orient("top"));
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([FetchConsumerPerSec])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,300]).height(35));
-// Añade la regla
-  div.append("div")
-      .attr("class", "rule")
-      .call(context.rule());
+let metrics = [];
+let limits = [];
+
+let nameRE = new RegExp("name=([^,]*)");
+let requestRE = new RegExp("request=([^,]*)");
+let topicRE = new RegExp("topic=([^,]*)");
+let versionRE = new RegExp("version=([0-9]*)")
+
+d3.json("http://localhost:9090/jmx/",(l) => {
+  for (i in l) {
+      let desc = "";
+      desc += l[i].key.match(requestRE) ? l[i].key.match(requestRE)[1] : "";
+      desc += l[i].key.match(nameRE) ? "/" + l[i].key.match(nameRE)[1] : "";
+      desc += l[i].key.match(topicRE) ? "/" + l[i].key.match(topicRE)[1] : "";
+      desc += l[i].key.match(versionRE) ? "/" + l[i].key.match(versionRE)[1] : "";
+      l[i].desc = desc;    
+  }
+
+  for (i in l.sort((x,y) => {return x.desc.localeCompare(y.desc)})) {
+    if (filter.test(l[i].key)) {
+      metrics.push(jmx(l[i].key,l[i].desc));
+      limits.push({"min": l[i].min, "max": l[i].max});  
+    }
+  }
+
+  d3.select("#example1").call(function(div) {
+    // Añade un eje
+    div.append("div")
+        .attr("class", "axis")
+        .call(context.axis().orient("top"));
+    // Añade los datos
+    div.selectAll(".horizon")
+        .data(metrics)
+      .enter().append("div")
+        .attr("class", "horizon")
+        .call(context.horizon().extent((j,k)=>{[limits[k].min,limits[k].max]}).height(35));
+    // Añade la regla
+    div.append("div")
+        .attr("class", "rule")
+        .call(context.rule());
+  });
+
+  // On mousemove, reposition the chart values to match the rule.
+  context.on("focus", function(i) {
+    d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
+  });
 });
 
-d3.select("#FetchFollowerPerSec").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([FetchFollowerPerSec,FetchPerSec,OffsetCommitPerSec,OffsetFetchPerSec,ProducePerSec])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,5000]).height(35));
-});
-
-d3.select("#idle").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([idle.multiply(-1).add(1)])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,1]).height(35).title("request pool use").colors(["#fee5d9","#fcae91","#fb6a4a","#cb181d","#fee5d9","#fcae91","#fb6a4a","#cb181d"]));
-});
-
-d3.select("#networkIdle").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([network_idle.multiply(-1).add(1)])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,1]).height(35).title("network pool use").colors(["#fee5d9","#fcae91","#fb6a4a","#cb181d","#fee5d9","#fcae91","#fb6a4a","#cb181d"]));
-});
-
-d3.select("#underReplicated").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([underReplicated])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,10]).height(35));
-});
-
-d3.select("#bytesIn").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([bytesIn])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,100000000]).height(35));
-});
-
-d3.select("#bytesOut").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([bytesOut])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,100000000]).height(35));
-});
-
-d3.select("#messagesIn").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([messagesIn])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,1000000]).height(35));
-});
-
-d3.select("#failedFetch").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([failedFetch,failedProduce])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,100]).height(35));
-});
-
-d3.select("#totalFetch").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([totalFetch,totalProduce])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,200000]).height(35));
-});
-
-d3.select("#FetchConsumerTime").call(function(div) {
-// Añade los datos
-  div.selectAll(".horizon")
-      .data([FetchConsumerTime,FetchFollowerTime,FetchTime,OffsetCommitTime,OffsetFetchTime,ProduceTime])
-    .enter().append("div")
-      .attr("class", "horizon")
-      .call(context.horizon().extent([0,1500]).height(35));
-});
-
-// On mousemove, reposition the chart values to match the rule.
-context.on("focus", function(i) {
-  d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
-});
 </script>

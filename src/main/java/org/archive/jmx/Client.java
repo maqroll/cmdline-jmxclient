@@ -28,6 +28,7 @@ package org.archive.jmx;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +36,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
 import javax.management.MBeanServerConnection;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
+import javax.management.ReflectionException;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
@@ -56,6 +61,8 @@ public class Client {
     private static JMXConnector jmxc;
 
     private static final long SLEEP_TIME = 1000;
+    
+    private static final int PARALLEL = 5;
     
     private static final String SEPARATOR = "@";
     
@@ -185,15 +192,32 @@ public class Client {
     	
         new Rest(values).start();
         
-    	// main loop
-        while (true) {
-	        execute(hostport,
-	            ((loginPassword == null)? null: loginPassword[0]),
-	            ((loginPassword == null)? null: loginPassword[1]), beanname,
-	            command);
-	        Thread.sleep(SLEEP_TIME);
-        }
+        String[] keys = values.keySet().toArray(new String[]{});
+        final int p = (keys.length < PARALLEL) ? keys.length : PARALLEL;
+    	final int step = keys.length/p;
+
+    	for (int i = 0; i < p; i++) {
+        	final int from = i * step;
+        	final int to = (i != (p-1))? (i+1)*step : keys.length; 
+
+        	new Thread(() -> {
+        		while (true) {
+        			try {
+        		        execute(hostport,
+        			            ((loginPassword == null)? null: loginPassword[0]),
+        			            ((loginPassword == null)? null: loginPassword[1]), beanname,
+        			            Arrays.copyOfRange(keys, from, to));
+        		        Thread.sleep(SLEEP_TIME);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+        		}
+        	}) .start();
+        }  
         
+        Thread.currentThread().join(); /* wait forever */
     }
     
     private List<String> resolveWildcards(String c,JMXConnector connector) {
@@ -254,10 +278,16 @@ public class Client {
         	MBeanServerConnection conn = jmxc.getMBeanServerConnection();
         	for(String c : command) {
         		String[] p = c.split(SEPARATOR);
-        		Object r = conn.getAttribute(new ObjectName(p[0]), p[1]);
-        		values.get(c).add(r.toString());
+        		try {
+        			Object r = conn.getAttribute(new ObjectName(p[0]), p[1]);
+            		values.get(c).add(r.toString());
+                } catch (AttributeNotFoundException | InstanceNotFoundException | MalformedObjectNameException | MBeanException
+        				| ReflectionException | IOException e) {
+                	System.err.println("Failed to get value for:" + c);
+        			e.printStackTrace();
+                }
         	}
-        } finally {
+		} finally {
             //jmxc.close();
         }
         return result;

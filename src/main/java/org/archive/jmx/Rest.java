@@ -16,7 +16,6 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 @Path("jmx")
 public class Rest {
@@ -57,6 +56,29 @@ public class Rest {
 		      return response;
 	}
 
+	@GET
+	@Path("/")
+	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
+	public Response getAll() {
+		StringBuffer r = new StringBuffer();
+		r.append("[");
+		
+		for (String k : values.keySet()) {
+			if (r.length() != 1) r.append(","); /* dirty hack */
+			r.append("{");
+			r.append("\"key\":\"" + k + "\"");
+			r.append(",\"min\":" + values.get(k).getMin());
+			r.append(",\"max\":" + values.get(k).getMax());
+			r.append("}");
+		}
+		
+		r.append("]");
+	    Response.ResponseBuilder rb = Response.ok(r.toString());
+	    Response response = rb.header("Access-Control-Allow-Origin","*")
+	                            .build();
+	    return response;		
+	}
+		
 	public void start() throws Exception {
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.setContextPath("/");

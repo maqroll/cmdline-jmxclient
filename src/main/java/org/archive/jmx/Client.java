@@ -26,42 +26,18 @@
 package org.archive.jmx;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.text.FieldPosition;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.management.Attribute;
-import javax.management.AttributeList;
-import javax.management.InstanceNotFoundException;
-import javax.management.IntrospectionException;
-import javax.management.MBeanAttributeInfo;
-import javax.management.MBeanFeatureInfo;
-import javax.management.MBeanInfo;
-import javax.management.MBeanOperationInfo;
-import javax.management.MBeanParameterInfo;
 import javax.management.MBeanServerConnection;
 import javax.management.MalformedObjectNameException;
-import javax.management.ObjectInstance;
 import javax.management.ObjectName;
-import javax.management.ReflectionException;
-import javax.management.openmbean.CompositeData;
-import javax.management.openmbean.TabularData;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
@@ -76,72 +52,19 @@ import javax.management.remote.JMXServiceURL;
  * and composite openmbeans.
  * @author stack
  */
-public class Client {
-    private static final Logger logger =
-        Logger.getLogger(Client.class.getName());
-    
+public class Client {    
     private static JMXConnector jmxc;
 
     private static final long SLEEP_TIME = 1000;
+    
+    private static final String SEPARATOR = "@";
     
     private static HashMap<String,Values> values = new HashMap<String,Values>();
     
     /**
      * Usage string.
      */
-    private static final String USAGE = "Usage: java -jar" +
-        " cmdline-jmxclient.jar USER:PASS HOST:PORT [BEAN] [COMMAND]\n" +
-        "Options:\n" +
-        " USER:PASS Username and password. Required. If none, pass '-'.\n" +
-        "           E.g. 'controlRole:secret'\n" +
-        " HOST:PORT Hostname and port to connect to. Required." +
-        " E.g. localhost:8081.\n" +
-        "           Lists registered beans if only USER:PASS and this" +
-        " argument.\n" +
-        " BEAN      Optional target bean name. If present we list" +
-        " available operations\n" +
-        "           and attributes.\n" +
-        " COMMAND   Optional operation to run or attribute to fetch. If" +
-        " none supplied,\n" +
-        "           all operations and attributes are listed. Attributes" +
-        " begin with a\n" +
-        "           capital letter: e.g. 'Status' or 'Started'." +
-        " Operations do not.\n" +
-        "           Operations can take arguments by adding an '=' " +
-        "followed by\n" +
-        "           comma-delimited params. Pass multiple " +
-        "attributes/operations to run\n" +
-        "           more than one per invocation. Use commands 'create' and " +
-        "'destroy'\n" +
-        "           to instantiate and unregister beans ('create' takes name " +
-        "of class).\n" +
-        "           Pass 'Attributes' to get listing of all attributes and " +
-        "and their\n" +
-        "           values.\n" +
-        "Requirements:\n" +
-        " JDK1.5.0. If connecting to a SUN 1.5.0 JDK JMX Agent, remote side" +
-        " must be\n" +
-        " started with system properties such as the following:\n" +
-        "     -Dcom.sun.management.jmxremote.port=PORT\n" +
-        "     -Dcom.sun.management.jmxremote.authenticate=false\n" +
-        "     -Dcom.sun.management.jmxremote.ssl=false\n" +
-        " The above will start the remote server with no password. See\n" +
-        " http://java.sun.com/j2se/1.5.0/docs/guide/management/agent.html" +
-        " for more on\n" +
-        " 'Monitoring and Management via JMX'.\n" +
-        "Client Use Examples:\n" +
-        " To list MBeans on a non-password protected remote agent:\n" +
-        "     % java -jar cmdline-jmxclient-X.X.jar - localhost:8081 \\\n" +
-        "         org.archive.crawler:name=Heritrix,type=Service\n" +
-        " To list attributes and attributes of the Heritrix MBean:\n" +
-        "     % java -jar cmdline-jmxclient-X.X.jar - localhost:8081 \\\n" +
-        "         org.archive.crawler:name=Heritrix,type=Service \\\n" +
-        "         schedule=http://www.archive.org\n" +
-        " To set set logging level to FINE on a password protected JVM:\n" +
-        "     % java -jar cmdline-jmxclient-X.X.jar controlRole:secret" +
-        " localhost:8081 \\\n" +
-        "         java.util.logging:type=Logging \\\n" +
-        "         setLoggerLevel=org.archive.crawler.Heritrix,FINE";
+    private static final String USAGE = "TODO";
     
     /**
      * Pattern that matches a command name followed by
@@ -151,19 +74,8 @@ public class Client {
     protected static final Pattern CMD_LINE_ARGS_PATTERN =
         Pattern.compile("^([^=]+)(?:(?:\\=)(.+))?$");
     
-    private static final String CREATE_CMD_PREFIX = "create=";
-    
 	public static void main(String[] args) throws Exception {
         Client client = new Client();
-        // Set the logger to use our all-on-one-line formatter.
-        Logger l = Logger.getLogger("");
-        Handler [] hs = l.getHandlers();
-        for (int i = 0; i < hs.length; i++) {
-            Handler h = hs[0];
-            if (h instanceof ConsoleHandler) {
-                h.setFormatter(client.new OneLineSimpleLogger());
-            }
-        }
         client.execute(args);
 	}
     
@@ -209,11 +121,11 @@ public class Client {
      * @param password
      * @return Credentials as map for RMI.
      */
-    protected Map formatCredentials(final String login,
+    protected Map<String,String[]> formatCredentials(final String login,
             final String password) {
-        Map env = null;
+        Map<String,String[]> env = null;
         String[] creds = new String[] {login, password};
-        env = new HashMap(1);
+        env = new HashMap<String,String[]>(1);
         env.put(JMXConnector.CREDENTIALS, creds);
         return env;
     }
@@ -257,24 +169,25 @@ public class Client {
                 command[i - 2] = args[i];
             }
         }
-        /*if (args.length > 3) {
-            command = new String [args.length - 3];
-            for (int i = 3; i < args.length; i++) {
-                command[i - 3] = args[i];
-            }
-        }*/
         String [] loginPassword = parseUserpass(userpass);
 
         /* Init */
     	for (String c : command) {
-    		values.put(c, new Values());
+    		if (c.split(SEPARATOR)[0].contains("*") /* Wildcards on the name */) {
+    			String prop = c.split(SEPARATOR)[1];
+    			for(String a : resolveWildcards(c,getJMXConnector(hostport,((loginPassword == null)? null: loginPassword[0]),((loginPassword == null)? null: loginPassword[1])))) {
+    				values.put(a + SEPARATOR + prop, new Values());
+    			}
+    		} else {
+    			values.put(c, new Values());
+    		}
     	}
     	
         new Rest(values).start();
         
     	// main loop
         while (true) {
-	        Object [] result = execute(hostport,
+	        execute(hostport,
 	            ((loginPassword == null)? null: loginPassword[0]),
 	            ((loginPassword == null)? null: loginPassword[1]), beanname,
 	            command);
@@ -283,7 +196,21 @@ public class Client {
         
     }
     
-    protected Object [] execute(final String hostport, final String login,
+    private List<String> resolveWildcards(String c,JMXConnector connector) {
+    	List<String> result = new ArrayList<String>();
+    	try {
+			Set<ObjectName> queryNames = connector.getMBeanServerConnection().queryNames(new ObjectName(c.split(SEPARATOR)[0]), null);
+			for (ObjectName n : queryNames) {
+				result.add(n.getCanonicalName());
+			}
+		} catch (MalformedObjectNameException | IOException e) {
+			System.err.println("Failed to resolve: " + c);
+			e.printStackTrace();
+		}
+    	return result;
+	}
+
+	protected Object [] execute(final String hostport, final String login,
             final String password, final String beanname,
             final String [] command)
     throws Exception {
@@ -326,7 +253,7 @@ public class Client {
         try {
         	MBeanServerConnection conn = jmxc.getMBeanServerConnection();
         	for(String c : command) {
-        		String[] p = c.split("@");
+        		String[] p = c.split(SEPARATOR);
         		Object r = conn.getAttribute(new ObjectName(p[0]), p[1]);
         		values.get(c).add(r.toString());
         	}
@@ -376,71 +303,4 @@ public class Client {
         }
     }
     
-    /**
-     * Logger that writes entry on one line with less verbose date.
-     * Modelled on the OneLineSimpleLogger from Heritrix.
-     * 
-     * @author stack
-     * @version $Revision$, $Date$
-     */
-    private class OneLineSimpleLogger extends SimpleFormatter {
-        /**
-         * Date instance.
-         * 
-         * Keep around instance of date.
-         */
-        private Date date = new Date();
-        
-        /**
-         * Field position instance.
-         * 
-         * Keep around this instance.
-         */
-        private FieldPosition position = new FieldPosition(0);
-        
-        /**
-         * MessageFormatter for date.
-         */
-        private SimpleDateFormat formatter =
-            new SimpleDateFormat("MM/dd/yyyy HH:mm:ss Z");
-        
-        /**
-         * Persistent buffer in which we conjure the log.
-         */
-        private StringBuffer buffer = new StringBuffer();
-        
-
-        public OneLineSimpleLogger() {
-            super();
-        }
-        
-        public synchronized String format(LogRecord record) {
-            this.buffer.setLength(0);
-            this.date.setTime(record.getMillis());
-            this.position.setBeginIndex(0);
-            //this.formatter.format(this.date, this.buffer, this.position);
-            //this.buffer.append(' ');
-            //if (record.getSourceClassName() != null) {
-            //    this.buffer.append(record.getSourceClassName());
-            //} else {
-            //    this.buffer.append(record.getLoggerName());
-            //}
-            //this.buffer.append(' ');
-            this.buffer.append(formatMessage(record));
-            this.buffer.append(System.getProperty("line.separator"));
-            if (record.getThrown() != null) {
-                try {
-                    StringWriter writer = new StringWriter();
-                    PrintWriter printer = new PrintWriter(writer);
-                    record.getThrown().printStackTrace(printer);
-                    writer.close();
-                    this.buffer.append(writer.toString());
-                } catch (Exception e) {
-                    this.buffer.append("Failed to get stack trace: " +
-                        e.getMessage());
-                }
-            }
-            return this.buffer.toString();
-        }
-    }
 }
